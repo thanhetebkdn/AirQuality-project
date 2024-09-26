@@ -34,7 +34,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define WIFI_AP "Xom Tro 1"
 #define WIFI_PASS "123conga"
 #define TB_SERVER "thingsboard.cloud"
-#define TOKEN "yYaO0sS1EwIGCwa00aXM"
+#define TOKEN "yYaO0sS1EwIGCwa00aXM"  
 
 WiFiClient espClient;
 Arduino_MQTT_Client mqttClient(espClient);
@@ -173,6 +173,22 @@ void dhtTask(void *pvParameters)
 
       // Send data to ThingsBoard
       sendDataToThingsBoard(temperature, humidity, air_quality_ppm);
+
+      // Update OLED Display
+      display.clearDisplay();
+      display.setCursor(0, 16);
+      display.print("Temp: ");
+      display.print(temperature);
+      display.println(" C");
+      display.setCursor(0, 32);
+      display.print("Hum: ");
+      display.print(humidity);
+      display.println(" %");
+      display.setCursor(0, 48);
+      display.print("PM: ");
+      display.print(air_quality_ppm);
+      display.println(" PPM");
+      display.display();
     }
     vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
