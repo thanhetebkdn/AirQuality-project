@@ -21,14 +21,14 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define MQ135_PIN 36
 
 /*------------- Define LED and Buzzer Pins -------------*/
-#define LED_PIN 4
-#define BUZZER_PIN 16
+#define LED_PIN 33
+#define BUZZER_PIN 19
 
 /*------------- Define thresholds -------------*/
-#define TEMP_THRESHOLD 30.0
-#define HUMIDITY_THRESHOLD 70.0
-#define AIR_QUALITY_THRESHOLD 500
-#define BUZZER_TEMP_THRESHOLD 30.0
+#define TEMP_THRESHOLD 40.0
+#define HUMIDITY_THRESHOLD 45.0
+#define AIR_QUALITY_THRESHOLD 400
+#define BUZZER_TEMP_THRESHOLD 50
 
 /*------------- WiFi and ThingsBoard credentials -------------*/
 #define WIFI_AP "Xom Tro 1"
@@ -92,7 +92,7 @@ void connectToThingsBoard()
 
 void sendDataToThingsBoard(float temp, float hum, float air_quality)
 {
-  String jsonData = "{\"temperature\":" + String(temp) + ", \"humidity\":" + String(hum) + ", \"air_quality\":" + String(air_quality) + "}";
+  String jsonData = "{\"temperature\":" + String(temp, 2) + ", \"humidity\":" + String(hum, 2) + ", \"air_quality\":" + String(air_quality, 2) + "}";
   tb.sendTelemetryJson(jsonData.c_str());
   Serial.println("Data sent to ThingsBoard");
 }
@@ -125,7 +125,7 @@ void setup()
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(BUZZER_PIN, HIGH);
 
   /*------------- Connect to WiFi and ThingsBoard -------------*/
   connectToWiFi();
@@ -134,8 +134,7 @@ void setup()
   /*------------- Create FreeRTOS tasks -------------*/
   xTaskCreatePinnedToCore(dhtTask, "DHT_Task", 10000, NULL, 1, &dhtTaskHandle, 0);
   xTaskCreatePinnedToCore(mqTask, "MQ_Task", 10000, NULL, 1, &mqTaskHandle, 0);
-  xTaskCreatePinnedToCore(ledTask, "LED_Task", 10000, NULL, 1, &ledTaskHandle, 1);
-  xTaskCreatePinnedToCore(buzzerTask, "Buzzer_Task", 10000, NULL, 1, &buzzerTaskHandle, 1);
+  xTaskCreatePinnedToCore(ledTask, "LED_Task", 10000, NULL, 1, &ledTaskHandle, 0);
 }
 
 void loop()
@@ -166,9 +165,9 @@ void dhtTask(void *pvParameters)
     else
     {
       Serial.print(F("Humidity: "));
-      Serial.print(humidity);
+      Serial.print(String(humidity, 2));  // Two decimal places for humidity
       Serial.print(F("%  Temperature: "));
-      Serial.print(temperature);
+      Serial.print(String(temperature, 2));  // Two decimal places for temperature
       Serial.println(F("°C"));
 
       // Send data to ThingsBoard
@@ -178,15 +177,15 @@ void dhtTask(void *pvParameters)
       display.clearDisplay();
       display.setCursor(0, 16);
       display.print("Temp: ");
-      display.print(temperature);
+      display.print(String(temperature, 2));  // Two decimal places for temperature
       display.println(" C");
       display.setCursor(0, 32);
       display.print("Hum: ");
-      display.print(humidity);
+      display.print(String(humidity, 2));  // Two decimal places for humidity
       display.println(" %");
       display.setCursor(0, 48);
       display.print("PM: ");
-      display.print(air_quality_ppm);
+      display.print(String(air_quality_ppm, 2));  // Two decimal places for air quality
       display.println(" PPM");
       display.display();
     }
@@ -203,7 +202,7 @@ void mqTask(void *pvParameters)
     air_quality_ppm = map(sensorValue, 0, 4095, 0, 1000);
 
     Serial.print("Estimated Air Quality: ");
-    Serial.print(air_quality_ppm);
+    Serial.print(String(air_quality_ppm, 2));  // Two decimal places for PPM
     Serial.println(" PPM");
 
     vTaskDelay(3000 / portTICK_PERIOD_MS);
@@ -219,7 +218,7 @@ void ledTask(void *pvParameters)
 
   while (1)
   {
-    if (temperature > TEMP_THRESHOLD || humidity > HUMIDITY_THRESHOLD || air_quality_ppm > AIR_QUALITY_THRESHOLD)
+    if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD || air_quality_ppm > AIR_QUALITY_THRESHOLD)
     {
       currentMillis = millis();
       if (currentMillis - lastBlinkTime >= 500)
@@ -227,30 +226,16 @@ void ledTask(void *pvParameters)
         lastBlinkTime = currentMillis;
         ledState = !ledState;
         digitalWrite(LED_PIN, ledState);
+        digitalWrite(BUZZER_PIN, LOW);
       }
     }
     else
     {
       digitalWrite(LED_PIN, LOW);
+      digitalWrite(BUZZER_PIN, HIGH);
     }
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
 
-/*------------- Task to handle Buzzer control -------------*/
-void buzzerTask(void *pvParameters)
-{
-  while (1)
-  {
-    if (temperature > BUZZER_TEMP_THRESHOLD)
-    {
-      digitalWrite(BUZZER_PIN, HIGH);
-    }
-    else
-    {
-      digitalWrite(BUZZER_PIN, LOW);
-    }
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-  }
-}
