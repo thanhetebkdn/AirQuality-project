@@ -2,7 +2,6 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <Fonts/FreeSerif9pt7b.h>
 #include <ThingsBoard.h>
 #include <Arduino_MQTT_Client.h>
 #include <WiFi.h>
@@ -44,9 +43,20 @@ WiFiClient espClient;
 Arduino_MQTT_Client mqttClient(espClient);
 ThingsBoard tb(mqttClient, 128);
 
+/*------------- Define buttons -------------*/
+#define BUTTON_UP_PIN 12    // Nút Lên
+#define BUTTON_DOWN_PIN 13  // Nút Xuống
+#define BUTTON_SELECT_PIN 14 // Nút Select
+#define BUTTON_BACK_PIN 26  // Nút Back
+
 /*------------- Global Variables -------------*/
 float temperature = 0.0, humidity = 0.0, air_quality_ppm = 0.0;
 float dust_density = 0.0;
+int menuIndex = 0;           // Để theo dõi mục menu hiện tại
+bool inRoomMenu = false;     // Kiểm tra có đang trong menu lựa chọn phòng hay không
+
+String rooms[] = {"Room 1", "Room 2", "Room 3"};  // Danh sách các phòng
+int currentRoom = 0;         // Phòng hiện tại được chọn
 
 /*------------- Task Handles -------------*/
 TaskHandle_t dhtTaskHandle;
@@ -106,10 +116,8 @@ void setup() {
   /*------------- Initialize OLED-------------*/
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("SSD1306 allocation failed");
-    for (;;)
-      ;
+    for (;;);
   }
-  display.setFont(&FreeSerif9pt7b);
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
@@ -126,6 +134,12 @@ void setup() {
   /*------------- Initialize Dust Sensor Pins -------------*/
   pinMode(LED_POWER_PIN, OUTPUT);
   digitalWrite(LED_POWER_PIN, HIGH); 
+
+  /*------------- Initialize Buttons -------------*/
+  pinMode(BUTTON_UP_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_DOWN_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_BACK_PIN, INPUT_PULLUP);
 
   /*------------- Connect to WiFi and ThingsBoard -------------*/
   connectToWiFi();
@@ -198,9 +212,6 @@ void dustTask(void *pvParameters) {
     float voltage = dustVal * 0.0049; 
     dust_density = 0.172 * voltage - 0.1;
 
-    // if (dust_density < 0) dust_density = 0;
-    // if (dust_density > 0.5) dust_density = 0.5;
-
     Serial.print("Dust Density: ");
     Serial.print(String(dust_density * 1000.0, 2));  
     Serial.println(" µg/m³");
@@ -229,44 +240,67 @@ void ledTask(void *pvParameters) {
       digitalWrite(BUZZER_PIN, HIGH);
     }
 
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS); 
   }
 }
 
-
-/*------------- Task to update OLED display -------------*/
+/*------------- Task to handle menu and OLED display -------------*/
 void displayTask(void *pvParameters) {
   while (1) {
-   
-    display.clearDisplay();
-    display.setCursor(0, 16);
-    display.print("Temp: ");
-    display.print(String(temperature, 2)); 
-    display.println(" C");
-    
-    display.setCursor(0, 32);
-    display.print("Hum: ");
-    display.print(String(humidity, 2));  
-    display.println(" %");
-    
-    display.display(); 
+    if (!inRoomMenu) {
+      // Hiển thị menu chính với các phòng
+      display.clearDisplay();
+      display.setCursor(0, 16);
+      display.print("> ");
+      display.println(rooms[menuIndex]); // Hiển thị tên phòng theo menuIndex
+      display.display();
+      
+      // Xử lý nút Lên
+      if (digitalRead(BUTTON_UP_PIN) == LOW) {
+        menuIndex--;
+        if (menuIndex < 0) menuIndex = 2;  // Quay vòng menu
+        vTaskDelay(200); // Tránh trễ do nhấn nút
+      }
 
-    vTaskDelay(2000 / portTICK_PERIOD_MS); 
+      // Xử lý nút Xuống
+      if (digitalRead(BUTTON_DOWN_PIN) == LOW) {
+        menuIndex++;
+        if (menuIndex > 2) menuIndex = 0;  // Quay vòng menu
+        vTaskDelay(200);
+      }
 
-    display.clearDisplay();
-    display.setCursor(0, 16);
-    display.print("PM: ");
-    display.print(String(air_quality_ppm, 2));  
-    display.println(" PPM");
+      // Xử lý nút Select
+      if (digitalRead(BUTTON_SELECT_PIN) == LOW) {
+        currentRoom = menuIndex;  // Chọn phòng hiện tại
+        inRoomMenu = true;        // Chuyển sang chế độ hiển thị thông tin phòng
+        vTaskDelay(200);
+      }
+    } else {
+      // Hiển thị dữ liệu của phòng đã chọn
+      display.clearDisplay();
+      display.setCursor(0, 16);
+      display.print("Room: ");
+      display.println(rooms[currentRoom]);
 
-    display.setCursor(0, 32);
-    display.print("Dust: ");
-    display.print(String(dust_density * 1000.0, 2)); 
-    display.println(" µg/m³");
+      display.setCursor(0, 32);
+      display.print("Temp: ");
+      display.print(String(temperature, 2)); 
+      display.println(" C");
+      
+      display.setCursor(0, 48);
+      display.print("Hum: ");
+      display.print(String(humidity, 2));  
+      display.println(" %");
 
-    display.display(); 
+      display.display();
+      
+      // Xử lý nút Back để quay về menu chính
+      if (digitalRead(BUTTON_BACK_PIN) == LOW) {
+        inRoomMenu = false;  // Quay lại menu chính
+        vTaskDelay(200);
+      }
+    }
 
-    vTaskDelay(2000 / portTICK_PERIOD_MS); 
+    vTaskDelay(100 / portTICK_PERIOD_MS); 
   }
 }
-

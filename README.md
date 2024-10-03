@@ -15,6 +15,11 @@ This project aims to design and implement an Indoor Air Quality Monitoring Syste
   <img src="so-do-mach.jpg" alt="" width="800">
 </p>
 
+# Cloud
+
+<p align="center">
+  <img src="thingsboard.png" alt="" width="800">
+</p>
 # Results
 
 The system successfully measured and transmitted real-time air quality data to a cloud platform (ThingsBoard or ThingSpeak), where it was visualized through dashboards. Alerts were triggered based on preset thresholds for gas concentrations and temperature, enabling quick response.

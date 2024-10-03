@@ -22,11 +22,15 @@ int totalMenuItems = 3;
 String mainMenuItems[] = {"Room-1", "Room-2", "Room-3"};
 String room1SubMenuItems[] = {"Sensor", "Actors", "Settings"};
 String sensorSubMenuItems[] = {"DHT-11", "MQ-135", "Dust-Sensor"}; // Submenu for sensors
+String settingsList[] = {"Temperature", "Humidity", "Dust"};
 
 // Track if we are in the main menu, Room-1 submenu, or sensor submenu
 bool inMainMenu = true; 
 bool inSensorMenu = false; // Track if we are in the sensor menu
+bool inSettingsMenu = false; 
+
 int room1MenuItems = 3;
+int settingSubmenuItems = 3;
 
 // Debounce states for buttons
 bool buttonUpPressed = false;
@@ -98,7 +102,22 @@ void displaySensorSubMenu() {
     display.display();
 }
 
+void displaySettings() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
 
+  for (int i = 0; i < settingSubmenuItems; i++) {
+    if(i == currentMenu){
+      display.setCursor(0, i * 16);
+      display.print("> ");
+    } else {
+      display.setCursor(18, i * 16);
+    }
+    display.println(settingsList[i]);
+  }
+  display.display();
+}
 
 void setup() {
     Serial.begin(115200);
@@ -119,84 +138,91 @@ void setup() {
 }
 
 void loop() {
-    // Check if the UP button is pressed
+    // Kiểm tra nếu nút UP được nhấn
     if (digitalRead(BUTTON_UP_PIN) == LOW && !buttonUpPressed) {
-        Serial.println("UP button pressed"); // Print message when UP is pressed
+        Serial.println("UP button pressed"); 
         currentMenu--;
         if (currentMenu < 0) {
-            currentMenu = (inMainMenu) ? totalMenuItems - 1 : (inSensorMenu ? 2 : room1MenuItems - 1);
+            currentMenu = (inMainMenu) ? totalMenuItems - 1 : (inSensorMenu ? 2 : (inSettingsMenu ? settingSubmenuItems - 1 : room1MenuItems - 1));
         }
         if (inMainMenu) {
             displayMainMenu();
         } else if (inSensorMenu) {
             displaySensorSubMenu();
+        } else if (inSettingsMenu) {
+            displaySettings();
         } else {
             displayRoom1SubMenu();
         }
-        buttonUpPressed = true; // Mark button as pressed
+        buttonUpPressed = true; 
     } else if (digitalRead(BUTTON_UP_PIN) == HIGH) {
-        buttonUpPressed = false; // Reset button state when released
+        buttonUpPressed = false; 
     }
 
-    // Check if the DOWN button is pressed
+    // Kiểm tra nếu nút DOWN được nhấn
     if (digitalRead(BUTTON_DOWN_PIN) == LOW && !buttonDownPressed) {
-        Serial.println("DOWN button pressed"); // Print message when DOWN is pressed
+        Serial.println("DOWN button pressed"); 
         currentMenu++;
-        if (currentMenu >= (inMainMenu ? totalMenuItems : (inSensorMenu ? 3 : room1MenuItems))) {
+        if (currentMenu >= (inMainMenu ? totalMenuItems : (inSensorMenu ? 3 : (inSettingsMenu ? settingSubmenuItems : room1MenuItems)))) {
             currentMenu = 0;
         }
         if (inMainMenu) {
             displayMainMenu();
         } else if (inSensorMenu) {
             displaySensorSubMenu();
+        } else if (inSettingsMenu) {
+            displaySettings();
         } else {
             displayRoom1SubMenu();
         }
-        buttonDownPressed = true; // Mark button as pressed
+        buttonDownPressed = true;
     } else if (digitalRead(BUTTON_DOWN_PIN) == HIGH) {
-        buttonDownPressed = false; // Reset button state when released
+        buttonDownPressed = false; 
     }
 
-    // Check if the SELECT button is pressed
+    // Xử lý nút SELECT
     if (digitalRead(BUTTON_SELECT_PIN) == LOW && !buttonSelectPressed) {
-        Serial.println("SELECT button pressed"); // Print message when SELECT is pressed
+        Serial.println("SELECT button pressed");
 
         if (inMainMenu) {
-            // If in the main menu, check if "Room-1" is selected
             if (currentMenu == 0) {
-                inMainMenu = false; // Switch to the submenu for "Room-1"
-                currentMenu = 0; // Reset menu index for the submenu
+                inMainMenu = false;
+                currentMenu = 0;
                 displayRoom1SubMenu();
-            } else {
-                Serial.print("Selected: ");
-                Serial.println(mainMenuItems[currentMenu]); // Print selected main menu item
             }
         } else if (!inMainMenu && currentMenu == 0) {
-            // If "Sensor" is selected in Room-1 submenu
-            inSensorMenu = true; // Switch to the sensor submenu
-            currentMenu = 0; // Reset menu index for the sensor submenu
+            inSensorMenu = true;
+            currentMenu = 0;
             displaySensorSubMenu();
-        
+        } else if (!inMainMenu && currentMenu == 2) {
+            // Vào menu cài đặt
+            inSettingsMenu = true;
+            currentMenu = 0;
+            displaySettings();
         }
 
-        buttonSelectPressed = true; // Mark button as pressed
+        buttonSelectPressed = true;
     } else if (digitalRead(BUTTON_SELECT_PIN) == HIGH) {
-        buttonSelectPressed = false; // Reset button state when released
+        buttonSelectPressed = false; 
     }
 
-    // Check if the BACK button is pressed
+    // Xử lý nút BACK
     if (digitalRead(BUTTON_BACK_PIN) == LOW) {
         Serial.println("BACK button pressed");
 
-        if (inSensorMenu) {
-            inSensorMenu = false; // Exit the sensor menu
+        if (inSettingsMenu) {
+            inSettingsMenu = false; // Thoát khỏi menu cài đặt
             currentMenu = 0;
-            displayRoom1SubMenu(); // Go back to Room-1 submenu
+            displayRoom1SubMenu(); // Quay lại Room-1 submenu
+        } else if (inSensorMenu) {
+            inSensorMenu = false;
+            currentMenu = 0;
+            displayRoom1SubMenu();
         } else if (!inMainMenu) {
-            inMainMenu = true; // Go back to the main menu
+            inMainMenu = true;
             currentMenu = 0;
             displayMainMenu();
         }
-        delay(200); // Delay to avoid multiple presses
+        delay(200); // Tránh việc nhấn nhiều lần
     }
 }
