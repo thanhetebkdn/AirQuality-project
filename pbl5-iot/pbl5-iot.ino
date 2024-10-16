@@ -37,75 +37,82 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define WIFI_AP "Xom Tro 1"
 #define WIFI_PASS "123conga"
 #define TB_SERVER "thingsboard.cloud"
-#define TOKEN "yYaO0sS1EwIGCwa00aXM"  
+#define TOKEN "yYaO0sS1EwIGCwa00aXM"
 
 WiFiClient espClient;
 Arduino_MQTT_Client mqttClient(espClient);
 ThingsBoard tb(mqttClient, 128);
 
 /*------------- Define buttons -------------*/
-#define BUTTON_UP_PIN 12    // Nút Lên
-#define BUTTON_DOWN_PIN 13  // Nút Xuống
+#define BUTTON_UP_PIN 12     // Nút Lên
+#define BUTTON_DOWN_PIN 13   // Nút Xuống
 #define BUTTON_SELECT_PIN 14 // Nút Select
-#define BUTTON_BACK_PIN 26  // Nút Back
+#define BUTTON_BACK_PIN 26   // Nút Back
 
 /*------------- Global Variables -------------*/
 float temperature = 0.0, humidity = 0.0, air_quality_ppm = 0.0;
 float dust_density = 0.0;
-int menuIndex = 0;           // Để theo dõi mục menu hiện tại
-bool inRoomMenu = false;     // Kiểm tra có đang trong menu lựa chọn phòng hay không
-
-String rooms[] = {"Room 1", "Room 2", "Room 3"};  // Danh sách các phòng
-int currentRoom = 0;         // Phòng hiện tại được chọn
 
 /*------------- Task Handles -------------*/
 TaskHandle_t dhtTaskHandle;
 TaskHandle_t mqTaskHandle;
 TaskHandle_t ledTaskHandle;
-TaskHandle_t displayTaskHandle; 
-TaskHandle_t dustTaskHandle; 
+TaskHandle_t displayTaskHandle;
+TaskHandle_t dustTaskHandle;
 
 /*------------- Functions for WiFi and ThingsBoard -------------*/
-void connectToWiFi() {
+void connectToWiFi()
+{
   Serial.println("Connecting to WiFi...");
   int attempts = 0;
 
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 20)
+  {
     WiFi.begin(WIFI_AP, WIFI_PASS);
     delay(500);
     Serial.print(".");
     attempts++;
   }
 
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED)
+  {
     Serial.println("\nFailed to connect to WiFi.");
-  } else {
+  }
+  else
+  {
     Serial.println("\nConnected to WiFi");
   }
 }
 
-void connectToThingsBoard() {
-  if (!tb.connected()) {
+void connectToThingsBoard()
+{
+  if (!tb.connected())
+  {
     Serial.println("Connecting to ThingsBoard server");
 
-    if (!tb.connect(TB_SERVER, TOKEN)) {
+    if (!tb.connect(TB_SERVER, TOKEN))
+    {
       Serial.println("Failed to connect to ThingsBoard");
-    } else {
+    }
+    else
+    {
       Serial.println("Connected to ThingsBoard");
     }
   }
 }
 
-void sendDataToThingsBoard(float temp, float hum, float air_quality, float dust) {
-  String jsonData = "{\"temperature\":" + String(temp, 2) + 
-                     ", \"humidity\":" + String(hum, 2) + 
-                     ", \"air_quality\":" + String(air_quality, 2) + 
-                     ", \"dust_density\":" + String(dust, 2) + "}";
+void sendDataToThingsBoard(float temp, float hum, float air_quality, float dust)
+{
+  String jsonData = "{\"temperature\":" + String(temp, 2) +
+                    ", \"humidity\":" + String(hum, 2) +
+                    ", \"air_quality\":" + String(air_quality, 2) +
+                    ", \"dust_density\":" + String(dust, 2) + "}";
   tb.sendTelemetryJson(jsonData.c_str());
   Serial.println("Data sent to ThingsBoard");
 }
 
-void setup() {
+void setup()
+{
   /*------------- Initialize Serial Monitor-------------*/
   Serial.begin(115200);
   Serial.println(F("DHT-11, OLED, Buzzer, and ThingsBoard test!"));
@@ -114,9 +121,11 @@ void setup() {
   dht.begin();
 
   /*------------- Initialize OLED-------------*/
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  {
     Serial.println("SSD1306 allocation failed");
-    for (;;);
+    for (;;)
+      ;
   }
   display.clearDisplay();
   display.setTextSize(1);
@@ -130,10 +139,10 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(BUZZER_PIN, HIGH);
-  
+
   /*------------- Initialize Dust Sensor Pins -------------*/
   pinMode(LED_POWER_PIN, OUTPUT);
-  digitalWrite(LED_POWER_PIN, HIGH); 
+  digitalWrite(LED_POWER_PIN, HIGH);
 
   /*------------- Initialize Buttons -------------*/
   pinMode(BUTTON_UP_PIN, INPUT_PULLUP);
@@ -153,29 +162,37 @@ void setup() {
   xTaskCreatePinnedToCore(dustTask, "Dust_Task", 10000, NULL, 1, &dustTaskHandle, 0); // New task for dust sensor
 }
 
-void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
+void loop()
+{
+  if (WiFi.status() != WL_CONNECTED)
+  {
     connectToWiFi();
   }
-  if (!tb.connected()) {
+  if (!tb.connected())
+  {
     connectToThingsBoard();
   }
   tb.loop();
 }
 
 /*------------- Task to handle DHT sensor readings -------------*/
-void dhtTask(void *pvParameters) {
-  while (1) {
+void dhtTask(void *pvParameters)
+{
+  while (1)
+  {
     humidity = dht.readHumidity();
     temperature = dht.readTemperature();
 
-    if (isnan(humidity) || isnan(temperature)) {
+    if (isnan(humidity) || isnan(temperature))
+    {
       Serial.println(F("Failed to read from DHT sensor!"));
-    } else {
+    }
+    else
+    {
       Serial.print(F("Humidity: "));
-      Serial.print(String(humidity, 2));  
+      Serial.print(String(humidity, 2));
       Serial.print(F("%  Temperature: "));
-      Serial.print(String(temperature, 2)); 
+      Serial.print(String(temperature, 2));
       Serial.println(F("°C"));
 
       // Send data to ThingsBoard
@@ -186,13 +203,15 @@ void dhtTask(void *pvParameters) {
 }
 
 /*------------- Task to handle MQ-135 sensor readings -------------*/
-void mqTask(void *pvParameters) {
-  while (1) {
+void mqTask(void *pvParameters)
+{
+  while (1)
+  {
     int sensorValue = analogRead(MQ135_PIN);
     air_quality_ppm = map(sensorValue, 0, 4095, 0, 1000);
 
     Serial.print("Estimated Air Quality: ");
-    Serial.print(String(air_quality_ppm, 2));  
+    Serial.print(String(air_quality_ppm, 2));
     Serial.println(" PPM");
 
     vTaskDelay(3000 / portTICK_PERIOD_MS);
@@ -200,107 +219,79 @@ void mqTask(void *pvParameters) {
 }
 
 /*------------- Task to handle Dust Sensor readings -------------*/
-void dustTask(void *pvParameters) {
-  while (1) {
-    digitalWrite(LED_POWER_PIN, LOW); 
+void dustTask(void *pvParameters)
+{
+  while (1)
+  {
+    digitalWrite(LED_POWER_PIN, LOW);
     delayMicroseconds(280);
-    int dustVal = analogRead(DUST_PIN); 
+    int dustVal = analogRead(DUST_PIN);
     delayMicroseconds(40);
-    digitalWrite(LED_POWER_PIN, HIGH); 
+    digitalWrite(LED_POWER_PIN, HIGH);
     delayMicroseconds(9680);
 
-    float voltage = dustVal * 0.0049; 
+    float voltage = dustVal * 0.0049;
     dust_density = 0.172 * voltage - 0.1;
 
     Serial.print("Dust Density: ");
-    Serial.print(String(dust_density * 1000.0, 2));  
+    Serial.print(String(dust_density * 1000.0, 2));
     Serial.println(" µg/m³");
 
-    vTaskDelay(2000 / portTICK_PERIOD_MS); 
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
   }
 }
 
-/*------------- Task to handle LED control -------------*/
-void ledTask(void *pvParameters) {
+/*------------- Task to handle LED and Buzze control -------------*/
+void ledTask(void *pvParameters)
+{
   static unsigned long lastBlinkTime = 0;
   static bool ledState = LOW;
   unsigned long currentMillis;
 
-  while (1) {
-    if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD || air_quality_ppm > AIR_QUALITY_THRESHOLD) {
+  while (1)
+  {
+    if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD || air_quality_ppm > AIR_QUALITY_THRESHOLD)
+    {
       currentMillis = millis();
-      if (currentMillis - lastBlinkTime >= 500) {
+      if (currentMillis - lastBlinkTime >= 500)
+      {
         lastBlinkTime = currentMillis;
         ledState = !ledState;
         digitalWrite(LED_PIN, ledState);
         digitalWrite(BUZZER_PIN, LOW);
       }
-    } else {
+    }
+    else
+    {
       digitalWrite(LED_PIN, LOW);
       digitalWrite(BUZZER_PIN, HIGH);
     }
 
-    vTaskDelay(100 / portTICK_PERIOD_MS); 
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
 
 /*------------- Task to handle menu and OLED display -------------*/
-void displayTask(void *pvParameters) {
-  while (1) {
-    if (!inRoomMenu) {
-      // Hiển thị menu chính với các phòng
-      display.clearDisplay();
-      display.setCursor(0, 16);
-      display.print("> ");
-      display.println(rooms[menuIndex]); // Hiển thị tên phòng theo menuIndex
-      display.display();
-      
-      // Xử lý nút Lên
-      if (digitalRead(BUTTON_UP_PIN) == LOW) {
-        menuIndex--;
-        if (menuIndex < 0) menuIndex = 2;  // Quay vòng menu
-        vTaskDelay(200); // Tránh trễ do nhấn nút
-      }
+void displayTask(void *pvParameters)
+{
+  while (1)
+  {
+    display.clearDisplay();
+    display.setCursor(0, 16);
+    display.print("Room: ");
+    display.println(rooms[currentRoom]);
 
-      // Xử lý nút Xuống
-      if (digitalRead(BUTTON_DOWN_PIN) == LOW) {
-        menuIndex++;
-        if (menuIndex > 2) menuIndex = 0;  // Quay vòng menu
-        vTaskDelay(200);
-      }
+    display.setCursor(0, 32);
+    display.print("Temp: ");
+    display.print(String(temperature, 2));
+    display.println(" C");
 
-      // Xử lý nút Select
-      if (digitalRead(BUTTON_SELECT_PIN) == LOW) {
-        currentRoom = menuIndex;  // Chọn phòng hiện tại
-        inRoomMenu = true;        // Chuyển sang chế độ hiển thị thông tin phòng
-        vTaskDelay(200);
-      }
-    } else {
-      // Hiển thị dữ liệu của phòng đã chọn
-      display.clearDisplay();
-      display.setCursor(0, 16);
-      display.print("Room: ");
-      display.println(rooms[currentRoom]);
-
-      display.setCursor(0, 32);
-      display.print("Temp: ");
-      display.print(String(temperature, 2)); 
-      display.println(" C");
-      
-      display.setCursor(0, 48);
-      display.print("Hum: ");
-      display.print(String(humidity, 2));  
-      display.println(" %");
-
-      display.display();
-      
-      // Xử lý nút Back để quay về menu chính
-      if (digitalRead(BUTTON_BACK_PIN) == LOW) {
-        inRoomMenu = false;  // Quay lại menu chính
-        vTaskDelay(200);
-      }
-    }
-
-    vTaskDelay(100 / portTICK_PERIOD_MS); 
+    display.setCursor(0, 48);
+    display.print("Hum: ");
+    display.print(String(humidity, 2));
+    display.println(" %");
+    display.display();
   }
+
+  vTaskDelay(100 / portTICK_PERIOD_MS);
 }
