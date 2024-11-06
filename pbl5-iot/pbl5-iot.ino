@@ -36,6 +36,8 @@ float humidity = 0.0;
 float air_quality_ppm = 0.0;
 float dust_density = 0.0;
 
+QueueHandle_t sensorDataQueue;
+
 TaskHandle_t dhtTaskHandle;
 TaskHandle_t mqTaskHandle;
 TaskHandle_t warnTaskHandle;
@@ -95,20 +97,34 @@ void dhtTask(void *pvParameters)
   {
     humidity = dht.readHumidity();
     temperature = dht.readTemperature();
+
     if (!isnan(humidity) && !isnan(temperature))
     {
-      Serial.print("Humidity: ");
-      Serial.print(humidity, 2);
-      Serial.print("%  Temperature: ");
-      Serial.print(temperature, 2);
-      Serial.println("°C");
-      sendDataToThingsBoard(temperature, humidity, air_quality_ppm, dust_density);
+      // Serial.print("Humidity: ");
+      // Serial.print(humidity, 2);
+      // Serial.print("%  Temperature: ");
+      // Serial.print(temperature, 2);
+      // Serial.println("°C");
+
+      float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
+
+      if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS)
+      {
+        Serial.println("Data sent to Queue successfully in DHT Task!");
+        Serial.print("Sent Data -> Temperature: ");
+        Serial.print(temperature, 2);
+        Serial.print(" C, Humidity: ");
+        Serial.print(humidity, 2);
+        Serial.println(" %");
+        Serial.println("---------------------------------------");
+      }
+      else
+      {
+        Serial.println("Failed to send data to Queue in DHT Task!");
+      }
     }
-    else
-    {
-      Serial.println("Failed to read from DHT sensor!");
-    }
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // 4 seconds delay
   }
 }
 
@@ -118,10 +134,26 @@ void mqTask(void *pvParameters)
   {
     int sensorValue = analogRead(MQ135_PIN);
     air_quality_ppm = map(sensorValue, 0, 4095, 0, 1000);
-    Serial.print("Estimated Air Quality: ");
-    Serial.print(air_quality_ppm, 2);
-    Serial.println(" PPM");
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    // Serial.print("Estimated Air Quality: ");
+    // Serial.print(air_quality_ppm, 2);
+    // Serial.println(" PPM");
+
+    float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
+
+    if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS)
+    {
+      Serial.println("Data sent to Queue successfully in MQ Task!");
+      Serial.print("Sent Data -> Air Quality: ");
+      Serial.print(air_quality_ppm, 2);
+      Serial.println(" PPM");
+      Serial.println("---------------------------------------");
+    }
+    else
+    {
+      Serial.println("Failed to send data to Queue in MQ Task!");
+    }
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // 4 seconds delay
   }
 }
 
@@ -137,10 +169,26 @@ void dustTask(void *pvParameters)
     delayMicroseconds(9680);
     float voltage = dustVal * 0.0049;
     dust_density = 0.172 * voltage - 0.1;
-    Serial.print("Dust Density: ");
-    Serial.print(dust_density * 1000.0, 2);
-    Serial.println(" µg/m³");
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    // Serial.print("Dust Density: ");
+    // Serial.print(dust_density * 1000.0, 2);
+    // Serial.println(" µg/m³");
+
+    float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
+
+    if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS)
+    {
+      Serial.println("Data sent to Queue successfully in Dust Task!");
+      Serial.print("Sent Data -> Dust Density: ");
+      Serial.print(dust_density * 1000.0, 2);
+      Serial.println(" µg/m³");
+      Serial.println("---------------------------------------");
+    }
+    else
+    {
+      Serial.println("Failed to send data to Queue in Dust Task!");
+    }
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // 4 seconds delay
   }
 }
 
@@ -152,7 +200,6 @@ void warnTask(void *pvParameters)
 
   while (1)
   {
-    // Kiểm tra điều kiện cảnh báo (nhiệt độ > TEMP_THRESHOLD hoặc độ ẩm < HUMIDITY_THRESHOLD)
     if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD)
     {
       currentMillis = millis();
@@ -169,7 +216,7 @@ void warnTask(void *pvParameters)
       digitalWrite(LED_PIN, LOW);
       digitalWrite(BUZZER_PIN, HIGH);
     }
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
 
@@ -177,31 +224,71 @@ void oledTask(void *pvParameters)
 {
   while (1)
   {
-    display.clearDisplay();
+    float receivedData[4];
 
-    if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD)
+    // Kiểm tra nếu nhận dữ liệu từ Queue thành công
+    if (xQueueReceive(sensorDataQueue, (void *)receivedData, portMAX_DELAY) == pdTRUE)
     {
+      // Gán giá trị từ Queue vào các biến tương ứng
+      temperature = receivedData[0];
+      humidity = receivedData[1];
+      air_quality_ppm = receivedData[2];
+      dust_density = receivedData[3];
 
-      display.setTextSize(2);
-      display.setCursor(0, 0);
-      display.setTextColor(WHITE);
-      display.println("WARNING");
+      // In giá trị nhận được từ Queue trong Serial Monitor
+      Serial.println("Received Data from Queue:");
+      Serial.print("Temperature: ");
+      Serial.println(temperature, 2);
+      Serial.print("Humidity: ");
+      Serial.println(humidity, 2);
+      Serial.print("Air Quality: ");
+      Serial.println(air_quality_ppm, 2);
+      Serial.print("Dust Density: ");
+      Serial.println(dust_density * 1000.0, 2); // Hiển thị giá trị bụi ở µg/m³
+      Serial.println("-----------------------------------");
+
+      display.clearDisplay(); // Xóa màn hình trước khi hiển thị mới
+
+      // Kiểm tra điều kiện cảnh báo và hiển thị
+      if (temperature > TEMP_THRESHOLD || humidity < HUMIDITY_THRESHOLD)
+      {
+        display.setTextSize(2);
+        display.setCursor(0, 0);
+        display.setTextColor(WHITE);
+        display.println("WARNING");
+      }
+      else
+      {
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.print("Temperature: ");
+        display.print(temperature, 2);
+        display.println(" C");
+
+        display.setCursor(0, 16);
+        display.print("Humidity: ");
+        display.print(humidity, 2);
+        display.println(" %");
+
+        display.setCursor(0, 32);
+        display.print("A-Quality: ");
+        display.print(air_quality_ppm, 2);
+        display.println(" PPM");
+
+        display.setCursor(0, 48);
+        display.print("Dust: ");
+        display.print(dust_density * 1000.0, 2); // Hiển thị giá trị bụi ở µg/m³
+        display.println(" µg/m³");
+      }
+
+      display.display(); // Hiển thị toàn bộ dữ liệu một lần
     }
     else
     {
-      display.setTextSize(1);
-      display.setCursor(0, 0);
-      display.print("Temperature: ");
-      display.print(temperature, 2);
-      display.println(" C");
-      display.setCursor(0, 32);
-      display.print("Humidity: ");
-      display.print(humidity, 2);
-      display.println(" %");
+      Serial.println("Failed to receive data from Queue in OLED Task!");
     }
 
-    display.display();
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(2000 / portTICK_PERIOD_MS); // Delay 4 giây để dễ dàng quan sát
   }
 }
 
@@ -230,11 +317,13 @@ void setup()
   connectToWiFi();
   connectToThingsBoard();
 
+  sensorDataQueue = xQueueCreate(10, sizeof(float) * 4);
+
   xTaskCreate(dhtTask, "DHT_Task", 10000, NULL, 1, &dhtTaskHandle);
   xTaskCreate(mqTask, "MQ_Task", 10000, NULL, 1, &mqTaskHandle);
-  xTaskCreate(warnTask, "LED_Task", 10000, NULL, 1, &warnTaskHandle);
-  xTaskCreate(oledTask, "Display_Task", 10000, NULL, 1, &oledTaskHandle);
   xTaskCreate(dustTask, "Dust_Task", 10000, NULL, 1, &dustTaskHandle);
+  xTaskCreate(warnTask, "LED_Task", 10000, NULL, 2, &warnTaskHandle);
+  xTaskCreate(oledTask, "Display_Task", 10000, NULL, 2, &oledTaskHandle);
 }
 
 void loop()
