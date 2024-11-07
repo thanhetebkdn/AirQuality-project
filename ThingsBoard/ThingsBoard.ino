@@ -80,7 +80,6 @@ void loop()
 
   TempAndHumidity data = dhtSensor.getTempAndHumidity();
 
-  // Check if data is valid
   if (isnan(data.temperature) || isnan(data.humidity))
   {
     Serial.println("Failed to read from DHT sensor!");

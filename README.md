@@ -4,18 +4,19 @@
 
 This project aims to design and implement an Indoor Air Quality Monitoring System using an ESP32 microcontroller. The system continuously monitors the environment for critical air quality parameters, such as temperature, humidity, and gas concentration. These parameters help in understanding and controlling indoor air conditions, ensuring a healthy living environment. The data is collected through multiple sensors and sent to a cloud-based platform for visualization and analysis.
 
-# Sensors Used
+# Sensors
 
 1. MQ-135 Gas Sensor: Used to detect harmful gases, including CO2, NH3, alcohol, and benzene, providing an air quality index.
 2. DHT11 Temperature and Humidity Sensor: Measures ambient temperature and humidity levels.
 3. GP2Y1010 Dust Sensor: Monitors particulate matter (PM) concentrations, providing data on dust density.
 4. Buzzer: Provides an audible alert when the air quality deteriorates or exceeds specified limits (e.g., when the temperature exceeds 37°C).
 5. LED Indicators: Signals different levels of air quality.
+6. Oled Display: Displays real-time data on air quality parameters.
 <p align="center">
   <img src="so-do-mach.jpg" alt="" width="800">
 </p>
 
-# Cloud
+# Dashboard
 
 <p align="center">
   <img src="thingsboard.png" alt="" width="800">

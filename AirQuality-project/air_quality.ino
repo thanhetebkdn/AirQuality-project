@@ -11,8 +11,8 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define MQ135_PIN 36
-#define DUST_PIN 27
-#define LED_POWER_PIN 25
+#define MEASURE_PIN 25   
+#define LED_POWER_PIN 26
 #define LED_PIN 13
 #define BUZZER_PIN 19
 #define TEMP_THRESHOLD 35.0
@@ -34,7 +34,13 @@ ThingsBoard tb(mqttClient, 128);
 float temperature = 0.0;
 float humidity = 0.0;
 float air_quality_ppm = 0.0;
-float dust_density = 0.0;
+int samplingTime = 280;  
+int deltaTime = 40;      
+int sleepTime = 9680;   
+
+float voMeasured = 0;   
+float calcVoltage = 0;  
+float dust_density = 0;
 
 QueueHandle_t sensorDataQueue;
 
@@ -100,11 +106,6 @@ void dhtTask(void *pvParameters)
 
     if (!isnan(humidity) && !isnan(temperature))
     {
-      // Serial.print("Humidity: ");
-      // Serial.print(humidity, 2);
-      // Serial.print("%  Temperature: ");
-      // Serial.print(temperature, 2);
-      // Serial.println("°C");
 
       float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
 
@@ -134,10 +135,6 @@ void mqTask(void *pvParameters)
   {
     int sensorValue = analogRead(MQ135_PIN);
     air_quality_ppm = map(sensorValue, 0, 4095, 0, 1000);
-    // Serial.print("Estimated Air Quality: ");
-    // Serial.print(air_quality_ppm, 2);
-    // Serial.println(" PPM");
-
     float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
 
     if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS)
@@ -157,40 +154,43 @@ void mqTask(void *pvParameters)
   }
 }
 
-void dustTask(void *pvParameters)
-{
-  while (1)
-  {
-    digitalWrite(LED_POWER_PIN, LOW);
-    delayMicroseconds(280);
-    int dustVal = analogRead(DUST_PIN);
-    delayMicroseconds(40);
-    digitalWrite(LED_POWER_PIN, HIGH);
-    delayMicroseconds(9680);
-    float voltage = dustVal * 0.0049;
-    dust_density = 0.172 * voltage - 0.1;
-    // Serial.print("Dust Density: ");
-    // Serial.print(dust_density * 1000.0, 2);
-    // Serial.println(" µg/m³");
+void dustTask(void *pvParameters) {
+  while (1) {
+    // Bật IR LED
+    digitalWrite(LED_POWER_PIN, LOW); 
+    delayMicroseconds(samplingTime); // Delay 0.28ms
 
+    voMeasured = analogRead(MEASURE_PIN); // Đọc giá trị ADC V0
+    delayMicroseconds(deltaTime); // Delay 0.04ms
+    digitalWrite(LED_POWER_PIN, HIGH); // Tắt LED
+    delayMicroseconds(sleepTime); // Delay 9.68ms
+
+    // Tính điện áp từ giá trị ADC
+    calcVoltage = voMeasured * (3.3 / 4095.0); // Chuyển đổi giá trị ADC sang điện áp cho ESP32
+
+    // Tính mật độ bụi dựa trên điện áp đo được
+    if (calcVoltage < 0.1) {
+      dust_density = 0; // Loại bỏ nhiễu khi điện áp thấp
+    } else {
+      dust_density = 0.17 * calcVoltage - 0.1; // Áp dụng phương trình tính mật độ bụi
+    }
+
+    // Lưu dữ liệu vào mảng để gửi vào Queue
     float sensorData[4] = {temperature, humidity, air_quality_ppm, dust_density};
-
-    if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS)
-    {
+    if (xQueueSend(sensorDataQueue, (void *)sensorData, portMAX_DELAY) == pdPASS) {
       Serial.println("Data sent to Queue successfully in Dust Task!");
       Serial.print("Sent Data -> Dust Density: ");
-      Serial.print(dust_density * 1000.0, 2);
+      Serial.print(dust_density, 2);
       Serial.println(" µg/m³");
-      Serial.println("---------------------------------------");
-    }
-    else
-    {
+    } else {
       Serial.println("Failed to send data to Queue in Dust Task!");
     }
 
-    vTaskDelay(1000 / portTICK_PERIOD_MS); // 4 seconds delay
+    vTaskDelay(1000 / portTICK_PERIOD_MS); // 1 second delay
   }
 }
+
+
 
 void warnTask(void *pvParameters)
 {
@@ -244,7 +244,7 @@ void oledTask(void *pvParameters)
       Serial.print("Air Quality: ");
       Serial.println(air_quality_ppm, 2);
       Serial.print("Dust Density: ");
-      Serial.println(dust_density * 1000.0, 2); // Hiển thị giá trị bụi ở µg/m³
+      Serial.println(dust_density); // Hiển thị giá trị bụi ở µg/m³
       Serial.println("-----------------------------------");
 
       display.clearDisplay(); // Xóa màn hình trước khi hiển thị mới
@@ -277,7 +277,7 @@ void oledTask(void *pvParameters)
 
         display.setCursor(0, 48);
         display.print("Dust: ");
-        display.print(dust_density * 1000.0, 2); // Hiển thị giá trị bụi ở µg/m³
+        display.print(dust_density ); // Hiển thị giá trị bụi ở µg/m³
         display.println(" µg/m³");
       }
 
@@ -310,20 +310,19 @@ void setup()
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(BUZZER_PIN, HIGH);
-
   pinMode(LED_POWER_PIN, OUTPUT);
-  digitalWrite(LED_POWER_PIN, HIGH);
+  // digitalWrite(LED_POWER_PIN, HIGH);
 
   connectToWiFi();
   connectToThingsBoard();
 
   sensorDataQueue = xQueueCreate(10, sizeof(float) * 4);
 
-  xTaskCreate(dhtTask, "DHT_Task", 10000, NULL, 1, &dhtTaskHandle);
-  xTaskCreate(mqTask, "MQ_Task", 10000, NULL, 1, &mqTaskHandle);
-  xTaskCreate(dustTask, "Dust_Task", 10000, NULL, 1, &dustTaskHandle);
-  xTaskCreate(warnTask, "LED_Task", 10000, NULL, 2, &warnTaskHandle);
-  xTaskCreate(oledTask, "Display_Task", 10000, NULL, 2, &oledTaskHandle);
+  xTaskCreate(dhtTask, "DHT_Task", 2048, NULL, 1, &dhtTaskHandle);
+  xTaskCreate(mqTask, "MQ_Task", 2048, NULL, 1, &mqTaskHandle);
+  xTaskCreate(dustTask, "Dust_Task", 2048, NULL, 1, &dustTaskHandle);
+  xTaskCreate(warnTask, "LED_Task", 2048, NULL, 2, &warnTaskHandle);
+  xTaskCreate(oledTask, "Display_Task", 2048, NULL, 2, &oledTaskHandle);
 }
 
 void loop()
