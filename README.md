@@ -13,13 +13,13 @@ This project aims to design and implement an Indoor Air Quality Monitoring Syste
 5. LED Indicators: Signals different levels of air quality.
 6. Oled Display: Displays real-time data on air quality parameters.
 <p align="center">
-  <img src="so-do-mach.jpg" alt="" width="800">
+  <img src="./img/so-do-mach.jpg" alt="" width="800">
 </p>
 
 # Dashboard
 
 <p align="center">
-  <img src="thingsboard.png" alt="" width="800">
+  <img src="./img/thingsboard.png" alt="" width="800">
 </p>
 # Results
 
