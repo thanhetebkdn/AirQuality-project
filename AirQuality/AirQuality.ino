@@ -132,27 +132,16 @@ void dhtTask(void *pvParameters)
     float hum = dht.readHumidity();
     if (!isnan(temp) && !isnan(hum))
     {
-      temperature = temp; // Cập nhật giá trị toàn cục
-      humidity = hum;     // Cập nhật giá trị toàn cục
+      temperature = temp;
+      humidity = hum;
       Serial.print("DHT Data: ");
       Serial.print("Temp: ");
       Serial.print(temperature);
       Serial.print(" °C, Humidity: ");
       Serial.print(humidity);
       Serial.println(" %");
-
-      // In giá trị trước khi gửi vào Queue
-      Serial.print("Sending to Queue: Temp: ");
-      Serial.print(temperature);
-      Serial.print(" °C, Humidity: ");
-      Serial.print(humidity);
-      Serial.print(" %, Air Quality: ");
-      Serial.print(air_quality_ppm);
-      Serial.print(" PPM, Dust: ");
-      Serial.print(dust_density);
-      Serial.println(" ug/m3");
-
-      sendDataToQueue(temperature, humidity, air_quality_ppm, dust_density); // Gửi giá trị vào Queue
+      sendDataToQueue(temperature, humidity,
+                      air_quality_ppm, dust_density);
     }
     else
     {
@@ -286,7 +275,6 @@ void oledTask(void *pvParameters)
 
   while (1)
   {
-    // Chờ lấy dữ liệu từ Queue
     if (xQueueReceive(sensorQueue, &receivedData, portMAX_DELAY) == pdPASS)
     {
       display.clearDisplay();
@@ -314,21 +302,8 @@ void oledTask(void *pvParameters)
       display.println(" ug/m3");
 
       display.display();
-
-      // In giá trị đã hiển thị lên OLED
-      Serial.print("OLED Updated: Temp: ");
-      Serial.print(receivedData.temperature, 2);
-      Serial.print(" °C, Humidity: ");
-      Serial.print(receivedData.humidity, 2);
-      Serial.print(" %, Air Quality: ");
-      Serial.print(receivedData.air_quality_ppm, 2);
-      Serial.print(" PPM, Dust: ");
-      Serial.print(receivedData.dust_density, 2);
-      Serial.println(" ug/m3");
-
-      Serial.println("OLED Updated");
     }
-    vTaskDelay(1000 / portTICK_PERIOD_MS); // Hiển thị mỗi giây
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
 }
 
