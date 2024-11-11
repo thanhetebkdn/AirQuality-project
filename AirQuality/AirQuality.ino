@@ -32,10 +32,10 @@ float dustDensity = 0;
 #define DUST_THRESHOLD 12
 #define BUTTON_PIN 23
 
-#define WIFI_AP "Xom Tro 1"
-#define WIFI_PASS "123conga"
+#define WIFI_AP ""   // YOUR WIFI NAME
+#define WIFI_PASS "" // YOUR WIFI PASSWORD
 #define TB_SERVER "thingsboard.cloud"
-#define TOKEN "yYaO0sS1EwIGCwa00aXM"
+#define TOKEN "" // YOUR TOKEN
 
 DHT dht(DHTPIN, DHTTYPE);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
